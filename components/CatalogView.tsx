@@ -22,7 +22,14 @@ export function CatalogView() {
 
   async function load() {
     const res = await fetch("/api/products", { cache: "no-store" });
-    setRows(await res.json());
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !Array.isArray(data)) {
+      setErr(data && data.error ? String(data.error) : "Could not load catalogue.");
+      setRows([]);
+      return;
+    }
+    setErr("");
+    setRows(data);
   }
   useEffect(() => {
     load();
@@ -129,6 +136,8 @@ export function CatalogView() {
           </div>
         </div>
       )}
+
+      {err && !editing && <p className="mb-4 text-sm text-red-600">{err}</p>}
 
       <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-card">
         <table className="w-full text-left text-sm">

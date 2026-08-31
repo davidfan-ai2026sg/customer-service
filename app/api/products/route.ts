@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
+import { jsonError } from "@/lib/api-error";
 import { createProduct, listProducts } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export function GET() {
-  return NextResponse.json(listProducts(true));
+  try {
+    return NextResponse.json(listProducts(true));
+  } catch (e) {
+    return jsonError(e);
+  }
 }
 
 export async function POST(req: Request) {

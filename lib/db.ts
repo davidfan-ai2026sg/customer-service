@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
+import type BetterSqlite3 from "better-sqlite3";
 import { DEFAULT_SETTINGS, FAQS, PRODUCTS } from "./seed";
 import type {
   BotState,
@@ -18,17 +18,21 @@ import type {
 } from "./types";
 
 const globalForDb = globalThis as unknown as {
-  auntyHongDb?: Database.Database;
+  auntyHongDb?: BetterSqlite3.Database;
 };
 
 export function dbPath() {
-  const raw = process.env.DATABASE_PATH || "data/app.db";
-  return path.isAbsolute(raw) ? raw : path.join(process.cwd(), raw);
+  const raw = process.env.DATABASE_PATH;
+  if (raw) return path.isAbsolute(raw) ? raw : path.join(process.cwd(), raw);
+  // Vercel serverless is read-only except /tmp. Local keeps data/app.db.
+  if (process.env.VERCEL) return "/tmp/aunty-hong.db";
+  return path.join(process.cwd(), "data/app.db");
 }
 
-function migrate(db: Database.Database) {
+function migrate(db: BetterSqlite3.Database) {
+  const journal = process.env.VERCEL ? "DELETE" : "WAL";
   db.exec(`
-    PRAGMA journal_mode = WAL;
+    PRAGMA journal_mode = ${journal};
     PRAGMA foreign_keys = ON;
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -118,7 +122,7 @@ function migrate(db: Database.Database) {
   `);
 }
 
-function seed(db: Database.Database) {
+function seed(db: BetterSqlite3.Database) {
   const now = nowIso();
   const settingsCount = db.prepare("SELECT COUNT(*) AS c FROM settings").get() as { c: number };
   if (settingsCount.c === 0) {
@@ -209,15 +213,27 @@ export function nowIso() {
   return new Date().toISOString();
 }
 
-export function getDb(): Database.Database {
+function openSqlite(file: string): BetterSqlite3.Database {
+  // Load the native binding inside getDb so a missing binary is a catchable error.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Database = require("better-sqlite3") as typeof import("better-sqlite3");
+  return new Database(file);
+}
+
+export function getDb(): BetterSqlite3.Database {
   if (globalForDb.auntyHongDb) return globalForDb.auntyHongDb;
   const file = dbPath();
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const db = new Database(file);
-  migrate(db);
-  seed(db);
-  globalForDb.auntyHongDb = db;
-  return db;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const db = openSqlite(file);
+    migrate(db);
+    seed(db);
+    globalForDb.auntyHongDb = db;
+    return db;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`Aunty Hong database failed at ${file}: ${msg}`);
+  }
 }
 
 export function resetDbForTests() {
@@ -333,7 +349,7 @@ export function findDemoConversation(): Conversation {
 }
 
 export function createConversation(
-  db: Database.Database,
+  db: BetterSqlite3.Database,
   input: {
     channel: string;
     customer_name: string;
@@ -351,7 +367,7 @@ export function createConversation(
   return Number(info.lastInsertRowid);
 }
 
-export function insertMessage(db: Database.Database, conversationId: number, sender: Sender, content: string) {
+export function insertMessage(db: BetterSqlite3.Database, conversationId: number, sender: Sender, content: string) {
   const now = nowIso();
   const info = db
     .prepare(
