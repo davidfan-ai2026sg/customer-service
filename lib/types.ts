@@ -7,11 +7,11 @@ export type Sender = "customer" | "bot" | "staff";
 export type DeliveryType = "delivery" | "pickup";
 
 export type OrderStatus =
-  | "待确认"
-  | "已确认"
-  | "已发工厂"
-  | "已完成"
-  | "已取消";
+  | "Pending"
+  | "Confirmed"
+  | "Sent to kitchen"
+  | "Completed"
+  | "Cancelled";
 
 export type OrderStep =
   | "product"

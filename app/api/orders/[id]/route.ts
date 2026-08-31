@@ -4,7 +4,7 @@ import type { OrderStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const STATUSES: OrderStatus[] = ["待确认", "已确认", "已发工厂", "已完成", "已取消"];
+const STATUSES: OrderStatus[] = ["Pending", "Confirmed", "Sent to kitchen", "Completed", "Cancelled"];
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;

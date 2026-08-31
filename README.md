@@ -1,55 +1,62 @@
-# 味源食品客服订货工作台
+# Aunty Hong customer-service bot (Hong)
 
-演示无需第三方凭证。
+Hong is a 24/7 English WhatsApp bot for Aunty Hong (auntyhong.sg).
 
-给食品厂客服用的网页工作台：会话、目录、订单、发给工厂。
-## 本地运行
+Host it on Vercel. Hong quotes the catalogue, takes orders (prefix AH, minimum S$50), and emails a kitchen sheet to kitchen@auntyhong.sg.
 
-需要 Node.js 18+。在本目录先安装依赖，再启动开发服务器。
-打开 http://localhost:3000
+This repo is the bot plus a thin audit UI, not a staff CMS. Inbox, catalogue and orders screens are for watching Hong, taking over a hard chat, and sending a confirmed order to the kitchen. Customers never use those pages.
 
-生产构建使用 build 与 start 脚本。
-可选复制环境变量示例文件。
-## 如何演示
+Demo needs no third-party credentials: the built-in customer simulator talks to the same scripted bot as the live channel.
 
-1. 打开首页会话，右侧是客户模拟器。
-2. 询问：生抽多少钱？
-3. 下单：我要下单，味源特级生抽，48，没有，配送，再填姓名电话地址，最后确认。
-4. 打开订单页，应出现待确认新单。
-5. 详情页点发给工厂，可复制或打印生产通知单。
-6. 接管会话后机器人暂停，可人工回复。
+Kitchen: 1005 Aljunied Ave 5 #01-42, Singapore 389886. No walk-in shop. Currency SGD (S$).
 
-## 测试
+## Local run
 
-使用 test 脚本跑查价到下单的快乐路径。
-浏览器测试使用 test:e2e，需应用已在 3000 端口。
-## 页面
+Needs Node.js 18+. Install dependencies, then start the development server. Open http://localhost:3000
 
-- / 会话收件箱与客户模拟器
-- /orders 订单列表
-- /orders/编号 订单详情与发给工厂
-- /orders/编号/print 打印生产通知单
-- /catalog 商品目录
-- /settings 公司设置
+Production uses the build and start scripts. You may copy .env.example to .env.local.
 
-相关接口位于 /api 下：会话、模拟聊天、商品、订单、设置、即时通讯回调、健康检查。
+SQLite defaults to data/app.db (override with DATABASE_PATH). First start seeds the Aunty Hong catalogue.
 
-SQLite 默认文件 data/app.db，可用 DATABASE_PATH 覆盖。首次启动写入食品公司演示目录。
-## 连接官方 Cloud API（可选）
+## How to demo
 
-未填写即时通讯相关环境变量时，真实通道关闭，模拟器仍可用。
+1. Open /. The right-hand Customer simulator is a fake chat thread.
+2. Ask: how much are the shrimp fries?
+3. Order: place an order, then SQ0179319 (gold tin shrimp fries, S$22), then 3, then no, then delivery, then name, +65 9123 4567, address, none, then confirm.
+4. Open /orders. A new Pending order appears (AH..., total S$66).
+5. Open the order and send it to the kitchen (copy or print the kitchen sheet). Status becomes Sent to kitchen.
+6. Take over a chat to pause Hong; resume to put automatic replies back on.
 
-若要接入官方云接口：
-1. 在 Meta 开发者后台创建应用并取得令牌、号码 ID、App Secret。
-2. 将本应用以 HTTPS 公网地址暴露（部署或本地隧道均可）。
-3. 回调路径为 /api/whatsapp/webhook ，验证令牌与 WHATSAPP_VERIFY_TOKEN 一致，订阅 messages。
-4. 在环境变量中填写 WHATSAPP_TOKEN、WHATSAPP_PHONE_NUMBER_ID、WHATSAPP_VERIFY_TOKEN、WHATSAPP_APP_SECRET、PUBLIC_APP_URL。
+## Hosted 24/7 (Vercel plus WhatsApp Cloud API)
 
-不使用任何非官方网页协议库。
+Deploy this Next.js app to Vercel (or any Node host) so Hong stays up overnight. Then wire the official Cloud API. No unofficial WhatsApp web libraries.
 
-## 可选邮件与语言模型
+1. In Meta Developer, create an app, add WhatsApp, and collect the access credentials and a verify string.
+2. Give the deployment a public HTTPS URL.
+3. Callback path: /api/whatsapp/webhook. The verify string must match WHATSAPP_VERIFY_TOKEN. Subscribe to messages.
+4. Set WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN, WHATSAPP_APP_SECRET, and PUBLIC_APP_URL.
 
-发给工厂：配置 RESEND_API_KEY 或 SMTP_* 。都不配时仍生成通知单，只是不发信。
-语言模型：OPENAI_API_KEY 仅用于润色措辞，不得改价格数量单号。无密钥时用目录关键词匹配。
+If those env vars are empty, the live channel is off and the simulator still works.
 
-全部键名见 .env.example。
+## Tests
+
+The test script runs quote-to-order and prints HAPPY_PATH_PASS. Browser tests use the test:e2e script and need the app already on port 3000.
+
+## Pages (audit only)
+
+- / inbox and customer simulator
+- /orders orders Hong submitted
+- /orders/:id detail, status, send to kitchen
+- /orders/:id/print printable kitchen sheet
+- /catalog products Hong quotes
+- /settings company copy Hong uses in replies
+
+APIs under /api: conversations, demo chat, products, orders, settings, WhatsApp webhook, health.
+
+## Optional email and LLM
+
+Kitchen email: configure RESEND_API_KEY or SMTP_*. If neither is set, Hong still builds the kitchen sheet; it just does not send mail.
+
+LLM: OPENAI_API_KEY only polishes wording. It must not change prices, quantities, or order numbers. Without a key, Hong uses catalogue keyword matching.
+
+All keys are listed in .env.example.

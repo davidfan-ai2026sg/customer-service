@@ -9,7 +9,7 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:3000",
     trace: "on-first-retry",
-    locale: "zh-CN",
+    locale: "en-SG",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

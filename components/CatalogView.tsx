@@ -7,11 +7,11 @@ const empty = {
   name: "",
   sku: "",
   price: 0,
-  unit: "瓶",
+  unit: "tin",
   moq: 1,
   description: "",
   in_stock: 1,
-  category: "调味汁",
+  category: "Snacks",
   aliases: "",
 };
 
@@ -38,7 +38,7 @@ export function CatalogView() {
       body: JSON.stringify(editing),
     });
     if (!res.ok) {
-      setErr("保存失败，请检查 SKU 是否重复。");
+      setErr("Could not save. Check the SKU is unique.");
       return;
     }
     setEditing(null);
@@ -46,7 +46,7 @@ export function CatalogView() {
   }
 
   async function remove(id: number) {
-    if (!confirm("确定删除该商品？")) return;
+    if (!confirm("Delete this product?")) return;
     await fetch(`/api/products/${id}`, { method: "DELETE" });
     await load();
   }
@@ -55,61 +55,61 @@ export function CatalogView() {
     <div className="p-8">
       <div className="mb-6 flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">商品目录</h1>
-          <p className="mt-1 text-sm text-ink-700/70">价格、起订量与库存会直接被客服机器人引用。</p>
+          <h1 className="text-2xl font-semibold">Catalogue</h1>
+          <p className="mt-1 text-sm text-ink-700/70">Prices, stock and names are what Hong quotes to customers.</p>
         </div>
         <button
           onClick={() => setEditing({ ...empty })}
           className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
         >
-          新增商品
+          Add product
         </button>
       </div>
 
       {editing && (
         <div className="mb-6 rounded-2xl border border-ink-100 bg-white p-5 shadow-card">
-          <div className="mb-3 text-sm font-semibold">{editing.id ? "编辑商品" : "新增商品"}</div>
+          <div className="mb-3 text-sm font-semibold">{editing.id ? "Edit product" : "Add product"}</div>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Field label="名称">
+            <Field label="Name">
               <input value={editing.name || ""} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
             </Field>
             <Field label="SKU">
               <input value={editing.sku || ""} onChange={(e) => setEditing({ ...editing, sku: e.target.value })} />
             </Field>
-            <Field label="单价">
+            <Field label="Price (S$)">
               <input
                 type="number"
                 value={editing.price ?? 0}
                 onChange={(e) => setEditing({ ...editing, price: Number(e.target.value) })}
               />
             </Field>
-            <Field label="单位">
+            <Field label="Unit">
               <input value={editing.unit || ""} onChange={(e) => setEditing({ ...editing, unit: e.target.value })} />
             </Field>
-            <Field label="起订量">
+            <Field label="Min qty">
               <input
                 type="number"
                 value={editing.moq ?? 1}
                 onChange={(e) => setEditing({ ...editing, moq: Number(e.target.value) })}
               />
             </Field>
-            <Field label="分类">
+            <Field label="Category">
               <input value={editing.category || ""} onChange={(e) => setEditing({ ...editing, category: e.target.value })} />
             </Field>
-            <Field label="别名（逗号分隔）">
+            <Field label="Aliases (comma-separated)">
               <input value={editing.aliases || ""} onChange={(e) => setEditing({ ...editing, aliases: e.target.value })} />
             </Field>
-            <Field label="库存">
+            <Field label="Stock">
               <select
                 value={editing.in_stock ? "1" : "0"}
                 onChange={(e) => setEditing({ ...editing, in_stock: e.target.value === "1" ? 1 : 0 })}
               >
-                <option value="1">现货</option>
-                <option value="0">缺货</option>
+                <option value="1">In stock</option>
+                <option value="0">Sold out</option>
               </select>
             </Field>
             <div className="col-span-2 md:col-span-4">
-              <Field label="描述">
+              <Field label="Description">
                 <textarea
                   rows={2}
                   value={editing.description || ""}
@@ -121,10 +121,10 @@ export function CatalogView() {
           {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
           <div className="mt-4 flex gap-2">
             <button onClick={save} className="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white">
-              保存
+              Save
             </button>
             <button onClick={() => setEditing(null)} className="rounded-lg bg-ink-50 px-4 py-2 text-sm">
-              取消
+              Cancel
             </button>
           </div>
         </div>
@@ -134,7 +134,7 @@ export function CatalogView() {
         <table className="w-full text-left text-sm">
           <thead className="bg-ink-50 text-xs text-ink-700">
             <tr>
-              {["商品", "SKU", "分类", "价格", "起订", "库存", "操作"].map((h) => (
+              {["Product", "SKU", "Category", "Price", "Min", "Stock", "Actions"].map((h) => (
                 <th key={h} className="px-4 py-3 font-medium">
                   {h}
                 </th>
@@ -151,19 +151,19 @@ export function CatalogView() {
                 <td className="px-4 py-3 font-mono text-xs">{p.sku}</td>
                 <td className="px-4 py-3">{p.category}</td>
                 <td className="px-4 py-3">
-                  ¥{p.price}/{p.unit}
+                  S${p.price.toFixed(2)}/{p.unit}
                 </td>
                 <td className="px-4 py-3">
                   {p.moq}
                   {p.unit}
                 </td>
-                <td className="px-4 py-3">{p.in_stock ? "现货" : "缺货"}</td>
+                <td className="px-4 py-3">{p.in_stock ? "In stock" : "Sold out"}</td>
                 <td className="px-4 py-3">
                   <button className="mr-2 text-brand-700" onClick={() => setEditing(p)}>
-                    编辑
+                    Edit
                   </button>
                   <button className="text-red-600" onClick={() => remove(p.id)}>
-                    删除
+                    Delete
                   </button>
                 </td>
               </tr>

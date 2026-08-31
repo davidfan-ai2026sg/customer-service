@@ -12,24 +12,73 @@ import {
 } from "./db";
 import type { BotOrderState, BotState, Product, Settings } from "./types";
 
-const ESCALATE = ["转人工", "人工", "找客服", "投诉", "退货", "退款", "经理", "骗子", "举报"];
-const ORDER_START = ["下单", "订购", "购买", "采购", "要订", "下订单", "帮我订", "我要买", "我想买"];
-const CANCEL = ["取消", "算了", "不要了下单", "停止下单"];
-const YES = ["是", "对", "好", "要", "要的", "还有", "继续", "是的", "确认", "ok", "OK", "好的", "行"];
-const NO_MORE = ["没有", "没有了", "就这些", "不用了", "不了", "否", "不要了", "没了", "就这样"];
-const DELIVERY = ["配送", "快递", "送货", "物流", "冷链", "发货到"];
-const PICKUP = ["自提", "到厂", "来拿", "工厂提货", "自己来"];
-const GREET = ["你好", "您好", "在吗", "hi", "hello", "早上好", "下午好", "晚上好", "嗨"];
-const CATALOG = ["产品", "目录", "菜单", "价目", "有什么", "商品", "报价单", "price list"];
-const SKIP_NOTES = ["无", "没有", "跳过", "不用", "无备注", "没有备注"];
+const ESCALATE = [
+  "human",
+  "staff",
+  "agent",
+  "person",
+  "operator",
+  "refund",
+  "complaint",
+  "manager",
+  "speak to someone",
+  "talk to someone",
+  "real person",
+];
+const ORDER_START = [
+  "place an order",
+  "place order",
+  "i want to order",
+  "i'd like to order",
+  "id like to order",
+  "i want to buy",
+  "order now",
+  "buy now",
+  "checkout",
+];
+const CANCEL = ["cancel order", "stop ordering", "never mind", "forget it"];
+const YES = ["yes", "yeah", "yep", "sure", "ok", "okay", "more", "another", "add more"];
+const NO_MORE = [
+  "no",
+  "nope",
+  "that's all",
+  "thats all",
+  "nothing else",
+  "no more",
+  "done",
+  "that's it",
+  "thats it",
+];
+const DELIVERY = ["delivery", "deliver", "ship", "courier", "send to"];
+const PICKUP = ["collect", "pickup", "pick up", "self collect", "collection"];
+const GREET = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"];
+const CATALOG = ["menu", "catalogue", "catalog", "products", "price list", "what do you have", "what have you got"];
+const SKIP_NOTES = ["none", "no", "nothing", "skip", "na", "n/a", "no notes"];
+const CONFIRM = ["confirm", "yes", "submit", "looks good", "that's right", "thats right", "ok", "okay"];
+const MIN_ORDER = 50;
 
 function norm(text: string) {
   return text.trim().toLowerCase().replace(/\s+/g, "");
 }
 
 function includesAny(text: string, words: string[]) {
-  const t = text.trim();
-  return words.some((w) => t.includes(w));
+  const t = text.trim().toLowerCase();
+  return words.some((w) => {
+    const w2 = w.toLowerCase();
+    if (w2.length <= 3) {
+      return new RegExp(`(?:^|\\b)${escapeRe(w2)}(?:\\b|$)`, "i").test(t);
+    }
+    return t.includes(w2);
+  });
+}
+
+function escapeRe(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isGreet(text: string) {
+  const t = text.trim().toLowerCase().replace(/[!?.,]/g, "");
+  return GREET.some((g) => t === g || t.startsWith(g + " ")) || t.length <= 2;
 }
 
 export function parseQty(text: string): number | null {
@@ -39,6 +88,21 @@ export function parseQty(text: string): number | null {
   const n = Number(m[1]);
   if (!Number.isFinite(n) || n <= 0) return null;
   return Math.floor(n);
+}
+
+export function parseSgPhone(text: string): string | null {
+  const digits = text.replace(/\D/g, "");
+  let local = "";
+  if (digits.length === 8 && /^[689]/.test(digits)) local = digits;
+  else if (digits.length === 10 && digits.startsWith("65") && /^[689]/.test(digits.slice(2))) {
+    local = digits.slice(2);
+  } else if (digits.length === 11 && digits.startsWith("065") && /^[689]/.test(digits.slice(3))) {
+    local = digits.slice(3);
+  } else {
+    return null;
+  }
+  if (!/^[689]\d{7}$/.test(local)) return null;
+  return `+65 ${local}`;
 }
 
 export function matchProducts(text: string, products: Product[]): Product[] {
@@ -53,7 +117,7 @@ export function matchProducts(text: string, products: Product[]): Product[] {
     .map((p) => {
       const names = [p.name, p.sku, p.category, p.aliases]
         .join(",")
-        .split(/[,，]/)
+        .split(/[,，|]/)
         .map((s) => s.trim())
         .filter(Boolean);
       let score = 0;
@@ -62,7 +126,7 @@ export function matchProducts(text: string, products: Product[]): Product[] {
         if (!nn) continue;
         if (t === nn) score = Math.max(score, 100);
         else if (t.includes(nn)) score = Math.max(score, 80 + Math.min(nn.length, 10));
-        else if (nn.includes(t) && t.length >= 2) score = Math.max(score, 50 + t.length);
+        else if (nn.includes(t) && t.length >= 4) score = Math.max(score, 50 + t.length);
       }
       return { p, score };
     })
@@ -73,22 +137,40 @@ export function matchProducts(text: string, products: Product[]): Product[] {
   if (top >= 80) return scored.filter((x) => x.score >= top - 5).map((x) => x.p);
   if (top >= 50) return scored.filter((x) => x.score >= 50).slice(0, 5).map((x) => x.p);
 
-  if (/酱油/.test(raw)) return products.filter((p) => /酱油|生抽|老抽/.test(p.name + p.aliases));
-  if (/饺子|水饺/.test(raw)) return products.filter((p) => /水饺/.test(p.name));
+  if (/shrimp\s*fries|prawn\s*cracker/i.test(raw)) {
+    return products.filter((p) => /shrimp fries/i.test(p.name));
+  }
+  if (/belinjau|belinjo|emping/i.test(raw)) {
+    return products.filter((p) => /belinjau|emping|belinjo/i.test(p.name + p.aliases));
+  }
   return [];
 }
 
 function money(n: number) {
-  return `¥${n.toFixed(n % 1 === 0 ? 0 : 2)}`;
+  return `S$${n.toFixed(2)}`;
+}
+
+function soldOutHint(p: Product): string {
+  const n = p.name.toLowerCase();
+  if (n.includes("spring blossom")) {
+    return "The Prosperity Mix is in stock at S$128.00 if you would like a gift set.";
+  }
+  if (n.includes("almond butter") || n.includes("cashew butter")) {
+    return "Handmade Melty Kuih Bangkit is in stock at S$28.00.";
+  }
+  if (n.includes("mini") && n.includes("refill")) {
+    return "The Mini Traditional Shrimp Keropok tin is still available.";
+  }
+  return "Reply MENU to see what is in stock.";
 }
 
 export function formatProduct(p: Product) {
-  const stock = p.in_stock ? "现货" : "暂无库存";
+  const stock = p.in_stock ? "In stock" : "Sold out";
   return [
-    `【${p.name}】`,
-    `SKU：${p.sku}　分类：${p.category}`,
-    `价格：${money(p.price)} / ${p.unit}　起订量：${p.moq} ${p.unit}`,
-    `库存：${stock}`,
+    `${p.name}`,
+    `SKU: ${p.sku}  |  ${p.category}`,
+    `Price: ${money(p.price)} / ${p.unit}  (min ${p.moq} ${p.unit})`,
+    `Stock: ${stock}`,
     p.description,
   ].join("\n");
 }
@@ -100,66 +182,84 @@ function formatCatalog(products: Product[]) {
     arr.push(p);
     groups.set(p.category, arr);
   }
-  const lines = ["这是味源食品当前可售目录（含税参考价）："];
+  const lines = ["Aunty Hong catalogue (SGD, inclusive of GST where applicable):"];
   for (const [cat, items] of groups) {
-    lines.push(`\n「${cat}」`);
+    lines.push(`\n${cat}`);
     for (const p of items) {
-      const stock = p.in_stock ? "" : "（缺货）";
-      lines.push(
-        `· ${p.name}  ${money(p.price)}/${p.unit}  起订 ${p.moq}${p.unit}  ${p.sku}${stock}`
-      );
+      const stock = p.in_stock ? "" : " [sold out]";
+      lines.push(`- ${p.name}  ${money(p.price)}/${p.unit}  ${p.sku}${stock}`);
     }
   }
-  lines.push("\n直接回复商品名可看详情，回复「下单」开始采购。");
+  lines.push("\nReply with a product name for details, or say PLACE AN ORDER to start.");
+  lines.push("Online minimum is S$50.");
   return lines.join("\n");
 }
 
+function cartTotal(order: BotOrderState) {
+  return order.items.reduce((s, i) => s + i.price * i.qty, 0);
+}
+
 function cartText(order: BotOrderState) {
-  if (!order.items.length) return "（购物车为空）";
+  if (!order.items.length) return "(cart is empty)";
   const lines = order.items.map(
-    (i, idx) =>
-      `${idx + 1}. ${i.name} × ${i.qty}${i.unit}　${money(i.price * i.qty)}`
+    (i, idx) => `${idx + 1}. ${i.name} x ${i.qty} ${i.unit}  ${money(i.price * i.qty)}`
   );
-  const total = order.items.reduce((s, i) => s + i.price * i.qty, 0);
-  lines.push(`合计：${money(total)}`);
+  lines.push(`Total: ${money(cartTotal(order))}`);
   return lines.join("\n");
 }
 
 function confirmText(order: BotOrderState) {
   const ship =
     order.deliveryType === "pickup"
-      ? "工厂自提"
-      : `配送　地址：${order.address || "（未填）"}`;
-  return [
-    "请确认订单信息：",
+      ? "Collection by arrangement (Aljunied kitchen, not a walk-in shop)"
+      : `Delivery  address: ${order.address || "(missing)"}`;
+  const lines = [
+    "Please confirm this order:",
     cartText(order),
-    `收货方式：${ship}`,
-    `联系人：${order.name}　电话：${order.phone}`,
-    `备注：${order.notes || "无"}`,
+    `Fulfilment: ${ship}`,
+    `Contact: ${order.name}  ${order.phone}`,
+    `Notes: ${order.notes || "none"}`,
     "",
-    "回复「确认」提交订单，回复「取消」放弃，回复「修改」重新选品。",
-  ].join("\n");
+    "Reply CONFIRM to submit, CANCEL to drop it, or CHANGE to add items.",
+  ];
+  if (cartTotal(order) < MIN_ORDER) {
+    lines.splice(
+      2,
+      0,
+      `Note: website minimum is S$50. This cart is ${money(cartTotal(order))}. You can still confirm and we will follow up.`
+    );
+  }
+  return lines.join("\n");
 }
 
 function faqAnswer(text: string, settings: Settings): string | null {
-  const t = text.trim();
-  if (includesAny(t, ["营业时间", "上班", "几点", "开门", "工作时间", "值班"])) {
-    return `我们的营业时间：${settings.business_hours}`;
+  const t = text.trim().toLowerCase();
+  if (includesAny(t, ["hours", "open", "opening", "close", "closing"])) {
+    return `Our hours: ${settings.business_hours}`;
   }
   const faqs = listFaqs();
   for (const f of faqs) {
-    const keys = f.keywords.split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+    const keys = f.keywords.split(/[,，]/).map((s) => s.trim().toLowerCase()).filter(Boolean);
     if (!keys.some((k) => t.includes(k))) continue;
-    if (f.question === "交期") return `交期说明：${settings.lead_time}`;
-    if (f.question === "配送") return `配送说明：${settings.delivery_info}`;
-    if (f.question === "自提") return `自提说明：${settings.pickup_info}`;
-    if (f.question === "付款") return `付款说明：${settings.payment_info}`;
+    if (f.question === "hours") return `Our hours: ${settings.business_hours}`;
+    if (f.question === "lead time") return `Lead time: ${settings.lead_time}`;
+    if (f.question === "delivery") return `Delivery: ${settings.delivery_info}`;
+    if (f.question === "pickup") return `Collection: ${settings.pickup_info}`;
+    if (f.question === "payment") return `Payment: ${settings.payment_info}`;
     if (f.answer) return f.answer;
   }
-  if (includesAny(t, ["交期", "货期", "多久发货", "交货"])) return `交期说明：${settings.lead_time}`;
-  if (includesAny(t, ["运费", "配送", "物流", "冷链"])) return `配送说明：${settings.delivery_info}`;
-  if (includesAny(t, ["自提", "工厂地址", "提货"])) return `自提说明：${settings.pickup_info}`;
-  if (includesAny(t, ["付款", "转账", "账期", "月结"])) return `付款说明：${settings.payment_info}`;
+  if (includesAny(t, ["lead time", "how long", "when will it arrive", "shipping time"])) {
+    return `Lead time: ${settings.lead_time}`;
+  }
+  if (includesAny(t, ["delivery", "shipping", "courier", "postage"])) {
+    return `Delivery: ${settings.delivery_info}`;
+  }
+  if (includesAny(t, ["pickup", "collect", "walk-in", "walk in", "aljunied"])) {
+    return `Collection: ${settings.pickup_info}`;
+  }
+  if (includesAny(t, ["paynow", "payment", "pay", "bank transfer"])) {
+    return `Payment: ${settings.payment_info}`;
+  }
   return null;
 }
 
@@ -192,14 +292,17 @@ export function replyAsBot(conversationId: number, text: string): string[] {
     setConversationStatus(conversationId, "waiting_staff");
     setBotState(conversationId, idleBotState());
     return [
-      "已为您转接人工客服。工作时间内同事会尽快回复；您也可以在消息里补充公司名与需求。",
+      "I am handing this to a teammate. During business hours someone will reply on WhatsApp. You can also write to +65 9638 1788.",
     ];
   }
 
   if (state.mode === "ordering" && state.order) {
-    if (includesAny(trimmed, ["取消订单", "取消下单"]) || (state.order.step !== "more" && trimmed === "取消")) {
+    if (
+      includesAny(trimmed, CANCEL) ||
+      (state.order.step !== "more" && state.order.step !== "confirm" && /^cancel$/i.test(trimmed))
+    ) {
       setBotState(conversationId, idleBotState());
-      return ["好的，已取消本次下单。需要时随时回复「下单」。"];
+      return ["Okay, this order is cancelled. Say PLACE AN ORDER whenever you are ready."];
     }
     return continueOrder(conversationId, state.order, trimmed, products, settings);
   }
@@ -210,43 +313,46 @@ export function replyAsBot(conversationId: number, text: string): string[] {
 
   const faq = faqAnswer(trimmed, settings);
   const hits = matchProducts(trimmed, products);
-  const wantOrder = includesAny(trimmed, ORDER_START);
+  const wantOrder =
+    includesAny(trimmed, ORDER_START) ||
+    (hits.length === 1 && Boolean(parseQty(trimmed)) && /\b(want|order|buy|get|take)\b/i.test(trimmed));
   const qtyInText = parseQty(trimmed);
 
-  if (wantOrder || (hits.length === 1 && qtyInText && includesAny(trimmed, ["要", "订", "买", "来"]))) {
+  if (wantOrder) {
     return beginOrder(conversationId, trimmed, products, hits, qtyInText);
   }
 
   if (hits.length === 1) {
     const p = hits[0];
     const extra = faq ? `\n\n${faq}` : "";
-    return [
-      formatProduct(p) +
-        extra +
-        `\n\n交期：${settings.lead_time}\n回复「下单」或直接发数量（如「24」）即可采购。`,
-    ];
+    const sold = p.in_stock
+      ? `\n\nLead time: ${settings.lead_time}\nSay PLACE AN ORDER, or reply with a quantity (e.g. 3). Online minimum is S$50.`
+      : `\n\nThis item is sold out. ${soldOutHint(p)}`;
+    return [formatProduct(p) + extra + sold];
   }
 
   if (hits.length > 1) {
-    const list = hits.map((p) => `· ${p.name}　${money(p.price)}/${p.unit}　起订 ${p.moq}${p.unit}　${p.sku}`).join("\n");
-    return [`找到多款相关商品：\n${list}\n\n请回复完整名称或 SKU。`];
+    const list = hits
+      .map((p) => `- ${p.name}  ${money(p.price)}/${p.unit}  ${p.sku}${p.in_stock ? "" : " [sold out]"}`)
+      .join("\n");
+    return [`A few matches:\n${list}\n\nReply with the full name or SKU.`];
   }
 
   if (faq) return [faq];
 
-  if (includesAny(trimmed, GREET) || trimmed.length <= 2) {
+  if (isGreet(trimmed)) {
     return [settings.greeting];
   }
 
   setConversationStatus(conversationId, "waiting_staff");
   return [
-    "这个问题我还不太确定，已经帮您转给人工同事，避免给错信息。您可以再补充一下公司名称或具体需求。",
+    "I am not sure I have the right answer, so I have flagged this for a teammate rather than guess. You can also WhatsApp +65 9638 1788.",
   ];
 }
 
 function beginOrder(
   conversationId: number,
-  text: string,
+  _text: string,
   products: Product[],
   hits: Product[],
   qty: number | null
@@ -255,14 +361,14 @@ function beginOrder(
   if (hits.length === 1) {
     const p = hits[0];
     if (!p.in_stock) {
-      return [`抱歉，${p.name} 暂无库存。您可以回复「产品」看其他现货，或「转人工」咨询替代款。`];
+      return [`Sorry, ${p.name} is sold out. ${soldOutHint(p)}`];
     }
     if (qty && qty > 0) {
       if (qty < p.moq) {
         const state = startOrderState(p);
         setBotState(conversationId, state);
         return [
-          `${p.name} 起订量为 ${p.moq} ${p.unit}，您刚才说的是 ${qty} ${p.unit}。请重新回复数量（≥ ${p.moq}）。`,
+          `${p.name} has a minimum of ${p.moq} ${p.unit}. You said ${qty}. Please send a new quantity.`,
         ];
       }
       const order: BotOrderState = {
@@ -280,21 +386,21 @@ function beginOrder(
       };
       setBotState(conversationId, { mode: "ordering", order });
       return [
-        `已加入：${p.name} × ${qty}${p.unit}。\n${cartText(order)}\n\n还要其他商品吗？回复「有」继续选品，回复「没有」进入收货信息。`,
+        `Added: ${p.name} x ${qty} ${p.unit}.\n${cartText(order)}\n\nAnything else? Reply YES to add more, or NO to continue.`,
       ];
     }
     setBotState(conversationId, startOrderState(p));
     return [
-      `好的，准备订购【${p.name}】，${money(p.price)}/${p.unit}，起订 ${p.moq} ${p.unit}。\n请回复数量（数字即可）。`,
+      `Great, ${p.name} at ${money(p.price)} / ${p.unit}. How many ${p.unit}s would you like?`,
     ];
   }
   if (hits.length > 1) {
     setBotState(conversationId, startOrderState());
-    const list = hits.map((p) => `· ${p.name}　${p.sku}`).join("\n");
-    return [`请选择要订的具体商品：\n${list}`];
+    const list = hits.map((p) => `- ${p.name}  ${p.sku}`).join("\n");
+    return [`Which one would you like?\n${list}`];
   }
   setBotState(conversationId, startOrderState());
-  return ["好的，开始下单。请告诉我商品名称或 SKU（回复「产品」可看目录）。"];
+  return ["Sure, let's start an order. Tell me the product name or SKU (or reply MENU)."];
 }
 
 function continueOrder(
@@ -312,37 +418,41 @@ function continueOrder(
       const hits = matchProducts(text, products);
       if (hits.length === 1) {
         const p = hits[0];
-        if (!p.in_stock) return [`${p.name} 暂无库存，请换一款，或回复「产品」查看目录。`];
+        if (!p.in_stock) return [`${p.name} is sold out. ${soldOutHint(p)}`];
         const qty = parseQty(text);
         if (qty) return addQty(conversationId, order, p, qty);
         save({ ...order, step: "qty", pendingProductId: p.id });
-        return [`已选择【${p.name}】，起订 ${p.moq} ${p.unit}。请回复数量。`];
+        return [`${p.name} it is. How many ${p.unit}s?`];
       }
       if (hits.length > 1) {
-        return [`找到多款：\n${hits.map((p) => `· ${p.name}　${p.sku}`).join("\n")}\n请回复其中一款的全名或 SKU。`];
+        return [`A few matches:\n${hits.map((p) => `- ${p.name}  ${p.sku}`).join("\n")}\nReply with the full name or SKU.`];
       }
-      return ["没有匹配到商品。请回复名称 / SKU，或回复「产品」查看目录。"];
+      return ["I could not match that. Send a product name or SKU, or reply MENU."];
     }
     case "qty": {
       const p = products.find((x) => x.id === order.pendingProductId);
       if (!p) {
         save({ ...order, step: "product", pendingProductId: undefined });
-        return ["商品信息丢失，请重新回复商品名称。"];
+        return ["I lost that product. Please send the name again."];
       }
       const qty = parseQty(text);
-      if (!qty) return [`请回复一个数字数量（${p.name} 起订 ${p.moq} ${p.unit}）。`];
+      if (!qty) return [`Please send a number (how many ${p.unit}s of ${p.name}).`];
       return addQty(conversationId, order, p, qty);
     }
     case "more": {
-      if (includesAny(text, NO_MORE) && !includesAny(text, ["还有"])) {
+      if (includesAny(text, NO_MORE)) {
         save({ ...order, step: "delivery" });
+        const warn =
+          cartTotal(order) < MIN_ORDER
+            ? `\nOnline minimum is S$50; this cart is ${money(cartTotal(order))}. You can still continue.`
+            : "";
         return [
-          `好的。当前清单：\n${cartText(order)}\n\n请选择收货方式：回复「配送」或「自提」。\n配送：${settings.delivery_info}\n自提：${settings.pickup_info}`,
+          `Got it.\n${cartText(order)}${warn}\n\nDelivery or collection? Reply DELIVERY or COLLECT.\nDelivery: ${settings.delivery_info}\nCollection: ${settings.pickup_info}`,
         ];
       }
-      if (includesAny(text, YES) || includesAny(text, ["还有", "继续", "再来", "再订"])) {
+      if (includesAny(text, YES)) {
         save({ ...order, step: "product", pendingProductId: undefined });
-        return ["请告诉我下一款商品名称或 SKU。"];
+        return ["What is the next product name or SKU?"];
       }
       const hits = matchProducts(text, products);
       if (hits.length === 1) {
@@ -350,43 +460,44 @@ function continueOrder(
         const qty = parseQty(text);
         if (qty) return addQty(conversationId, order, p, qty);
         save({ ...order, step: "qty", pendingProductId: p.id });
-        return [`已选择【${p.name}】，请回复数量（起订 ${p.moq} ${p.unit}）。`];
+        return [`${p.name}. How many ${p.unit}s?`];
       }
-      return ["还要其他商品吗？回复「有」继续，或「没有 / 就这些」进入收货信息。也可以直接发下一款商品名。"];
+      return ["Anything else? Reply YES to add more, or NO to continue. You can also send another product name."];
     }
     case "delivery": {
       if (includesAny(text, PICKUP)) {
         save({ ...order, step: "name", deliveryType: "pickup" });
-        return ["已选择工厂自提。请回复联系人姓名。"];
+        return [
+          "Collection at 1005 Aljunied Ave 5 #01-42, by arrangement only (not a walk-in shop). What is the contact name?",
+        ];
       }
-      if (includesAny(text, DELIVERY) || text.includes("送")) {
+      if (includesAny(text, DELIVERY)) {
         save({ ...order, step: "name", deliveryType: "delivery" });
-        return ["已选择物流配送。请回复联系人姓名。"];
+        return ["Islandwide delivery. What is the contact name?"];
       }
-      return ["请回复「配送」或「自提」。"];
+      return ["Please reply DELIVERY or COLLECT."];
     }
     case "name": {
-      const name = text.replace(/姓名|名字|我叫/g, "").trim();
-      if (name.length < 1 || name.length > 40) return ["请回复有效的联系人姓名。"];
+      const name = text.replace(/^(i am|i'm|im|name is|this is)\s+/i, "").trim();
+      if (name.length < 2 || name.length > 40) return ["Please send a contact name."];
       save({ ...order, step: "phone", name });
-      return ["请回复手机号码（11 位）。"];
+      return ["Singapore mobile number please (8 digits, or +65)."];
     }
     case "phone": {
-      const digits = text.replace(/\D/g, "");
-      const phone = digits.length === 13 && digits.startsWith("86") ? digits.slice(2) : digits;
-      if (!/^1\d{10}$/.test(phone)) return ["请回复 11 位中国大陆手机号，例如 13800138000。"];
+      const phone = parseSgPhone(text);
+      if (!phone) return ["Please send a Singapore number, e.g. +65 9123 4567."];
       updateCustomerProfile(conversationId, { customer_name: order.name, customer_phone: phone });
       if (order.deliveryType === "delivery") {
         save({ ...order, step: "address", phone });
-        return ["请回复详细收货地址（省市区街道门牌）。"];
+        return ["Delivery address in Singapore, including unit number if any."];
       }
       save({ ...order, step: "notes", phone });
-      return ["如有备注请直接发送（送货时间、开票信息等）；没有请回复「无」。"];
+      return ["Any notes (timing, gift message)? If none, reply NONE."];
     }
     case "address": {
-      if (text.length < 6) return ["地址有点短，请补充省市区与门牌。"];
+      if (text.length < 6) return ["That address looks short. Please include street and unit."];
       save({ ...order, step: "notes", address: text });
-      return ["如有备注请直接发送；没有请回复「无」。"];
+      return ["Any notes? If none, reply NONE."];
     }
     case "notes": {
       const notes = includesAny(text, SKIP_NOTES) ? "" : text;
@@ -395,25 +506,28 @@ function continueOrder(
       return [confirmText(next)];
     }
     case "confirm": {
-      if (includesAny(text, ["修改", "改一下", "重来"])) {
+      if (includesAny(text, ["change", "edit", "modify", "add"])) {
         save({ ...order, step: "product", pendingProductId: undefined });
-        return ["好的，请重新发送要订的商品。当前清单仍保留，新商品会追加。"];
+        return ["Okay, send the next product. The current cart stays."];
       }
-      if (includesAny(text, ["取消"])) {
+      if (includesAny(text, ["cancel"])) {
         setBotState(conversationId, idleBotState());
-        return ["已取消，未生成订单。"];
+        return ["Cancelled. No order was created."];
       }
-      if (includesAny(text, ["确认", "是", "对", "提交", "没问题"])) {
+      if (includesAny(text, CONFIRM)) {
         if (!order.items.length || !order.name || !order.phone || !order.deliveryType) {
           setBotState(conversationId, idleBotState());
-          return ["订单信息不完整，已取消。请重新回复「下单」。"];
+          return ["That order was incomplete, so I cancelled it. Say PLACE AN ORDER to start again."];
         }
         const created = createOrder({
           conversation_id: conversationId,
           customer_name: order.name,
           customer_phone: order.phone,
           delivery_type: order.deliveryType,
-          address: order.deliveryType === "pickup" ? "工厂自提" : order.address || "",
+          address:
+            order.deliveryType === "pickup"
+              ? "Collection by arrangement, 1005 Aljunied Ave 5 #01-42"
+              : order.address || "",
           notes: order.notes || "",
           items: order.items,
         });
@@ -423,36 +537,38 @@ function continueOrder(
         });
         setBotState(conversationId, idleBotState());
         const ship =
-          created.delivery_type === "pickup" ? "工厂自提" : `配送至 ${created.address}`;
+          created.delivery_type === "pickup"
+            ? "Collection by arrangement"
+            : `Delivery to ${created.address}`;
         return [
           [
-            `订单已提交，单号 ${created.order_no}，状态：待确认。`,
+            `Order submitted. Number ${created.order_no}. Status: Pending.`,
             cartText(order),
             ship,
-            `联系人 ${created.customer_name} ${created.customer_phone}`,
-            "工作人员确认后会安排排产与发货。如需修改请回复「转人工」。",
+            `Contact ${created.customer_name} ${created.customer_phone}`,
+            "The kitchen will confirm packing and delivery. Reply HUMAN if you need to change anything.",
           ].join("\n"),
         ];
       }
-      return ["请回复「确认」提交、「取消」放弃，或「修改」加商品。"];
+      return ["Reply CONFIRM to submit, CANCEL to drop it, or CHANGE to add items."];
     }
     default:
       setBotState(conversationId, idleBotState());
-      return ["会话状态已重置，请重新回复「下单」或商品名。"];
+      return ["I reset that chat. Say PLACE AN ORDER or a product name."];
   }
 }
 
 function addQty(conversationId: number, order: BotOrderState, p: Product, qty: number): string[] {
   if (!p.in_stock) {
     setBotState(conversationId, { mode: "ordering", order: { ...order, step: "product" } });
-    return [`${p.name} 暂无库存，请换一款。`];
+    return [`${p.name} is sold out. ${soldOutHint(p)}`];
   }
   if (qty < p.moq) {
     setBotState(conversationId, {
       mode: "ordering",
       order: { ...order, step: "qty", pendingProductId: p.id },
     });
-    return [`${p.name} 起订量为 ${p.moq} ${p.unit}，您回复的是 ${qty}。请重新输入数量。`];
+    return [`${p.name} minimum is ${p.moq} ${p.unit}. You sent ${qty}. Please send a new quantity.`];
   }
   const items = order.items.filter((i) => i.productId !== p.id);
   const existing = order.items.find((i) => i.productId === p.id);
@@ -467,7 +583,7 @@ function addQty(conversationId: number, order: BotOrderState, p: Product, qty: n
   const next: BotOrderState = { ...order, items, step: "more", pendingProductId: undefined };
   setBotState(conversationId, { mode: "ordering", order: next });
   return [
-    `已加入：${p.name} × ${qty}${p.unit}。\n${cartText(next)}\n\n还要其他商品吗？回复「有」或「没有」。`,
+    `Added: ${p.name} x ${qty} ${p.unit}.\n${cartText(next)}\n\nAnything else? Reply YES or NO.`,
   ];
 }
 

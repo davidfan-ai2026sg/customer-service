@@ -6,7 +6,7 @@ import { OrderBadge } from "./StatusBadge";
 import { formatDateTime } from "@/lib/time";
 import type { OrderStatus, OrderWithItems } from "@/lib/types";
 
-const STATUSES: OrderStatus[] = ["待确认", "已确认", "已发工厂", "已完成", "已取消"];
+const STATUSES: OrderStatus[] = ["Pending", "Confirmed", "Sent to kitchen", "Completed", "Cancelled"];
 
 export function OrderDetail({ id }: { id: number }) {
   const [order, setOrder] = useState<OrderWithItems | null>(null);
@@ -36,13 +36,13 @@ export function OrderDetail({ id }: { id: number }) {
     const res = await fetch(`/api/orders/${id}/factory`, { method: "POST" });
     const data = await res.json();
     if (!res.ok) {
-      setEmailMsg(data.error || "失败");
+      setEmailMsg(data.error || "Failed");
       return;
     }
     setOrder(data.order);
     setSheet(data.sheetText);
-    if (data.email?.sent) setEmailMsg(`已发信（${data.email.via}）到工厂邮箱。`);
-    else setEmailMsg(data.email?.error || "未配置邮件，请复制或打印生产通知单。");
+    if (data.email?.sent) setEmailMsg(`Sent (${data.email.via}) to the kitchen email.`);
+    else setEmailMsg(data.email?.error || "Email is not configured. Copy or print the kitchen sheet.");
   }
 
   async function copySheet() {
@@ -58,17 +58,17 @@ export function OrderDetail({ id }: { id: number }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = order.order_no + "-factory.txt";
+    a.download = order.order_no + "-kitchen.txt";
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  if (!order) return <div className="p-8 text-sm text-ink-700">加载中…</div>;
+  if (!order) return <div className="p-8 text-sm text-ink-700">Loading…</div>;
 
   return (
     <div className="p-8">
       <Link href="/orders" className="text-sm text-brand-700">
-        ← 返回订单列表
+        ← Back to orders
       </Link>
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -91,33 +91,33 @@ export function OrderDetail({ id }: { id: number }) {
             onClick={sendFactory}
             className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           >
-            发给工厂
+            Send to kitchen
           </button>
           <Link
             href={`/orders/${order.id}/print`}
             target="_blank"
             className="rounded-xl bg-ink-900 px-4 py-2 text-sm font-medium text-white"
           >
-            打印通知单
+            Print kitchen sheet
           </Link>
         </div>
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-ink-100 bg-white p-5 shadow-card">
-          <div className="text-sm font-semibold">客户</div>
+          <div className="text-sm font-semibold">Customer</div>
           <dl className="mt-3 space-y-2 text-sm">
-            <Row k="名称" v={order.customer_name} />
-            <Row k="电话" v={order.customer_phone} />
-            <Row k="方式" v={order.delivery_type === "pickup" ? "工厂自提" : "物流配送"} />
-            <Row k="地址" v={order.address || "-"} />
-            <Row k="备注" v={order.notes || "无"} />
-            <Row k="下单" v={formatDateTime(order.created_at)} />
-            <Row k="发工厂" v={order.factory_sent_at ? formatDateTime(order.factory_sent_at) : "尚未发送"} />
+            <Row k="Name" v={order.customer_name} />
+            <Row k="Phone" v={order.customer_phone} />
+            <Row k="Method" v={order.delivery_type === "pickup" ? "Collection" : "Delivery"} />
+            <Row k="Address" v={order.address || "-"} />
+            <Row k="Notes" v={order.notes || "None"} />
+            <Row k="Placed" v={formatDateTime(order.created_at)} />
+            <Row k="Kitchen" v={order.factory_sent_at ? formatDateTime(order.factory_sent_at) : "Not sent yet"} />
           </dl>
         </div>
         <div className="rounded-2xl border border-ink-100 bg-white p-5 shadow-card">
-          <div className="text-sm font-semibold">明细</div>
+          <div className="text-sm font-semibold">Items</div>
           <table className="mt-3 w-full text-sm">
             <tbody>
               {order.items.map((it) => (
@@ -130,23 +130,24 @@ export function OrderDetail({ id }: { id: number }) {
                     {it.qty}
                     {it.unit}
                   </td>
-                  <td className="py-2 text-right">¥{(it.unit_price * it.qty).toFixed(2)}</td>
+                  <td className="py-2 text-right">S${(it.unit_price * it.qty).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <div className="mt-3 text-right text-base font-semibold">合计 ¥{order.total.toFixed(2)}</div>
+          <div className="mt-3 text-right text-base font-semibold">Total S${order.total.toFixed(2)}</div>
         </div>
       </div>
 
       {(sheet || emailMsg) && (
         <div className="mt-6 rounded-2xl border border-ink-100 bg-white p-5 shadow-card">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold">生产通知单</div>
+            <div className="text-sm font-semibold">Kitchen sheet</div>
             <button onClick={copySheet} className="text-sm text-brand-700">
-              {copied ? "已复制" : "复制文本"}</button>
+              {copied ? "Copied" : "Copy text"}
+            </button>
             <button onClick={downloadSheet} className="text-sm text-brand-700">
-              下载
+              Download
             </button>
           </div>
           {emailMsg && <p className="mt-2 text-sm text-ink-700">{emailMsg}</p>}

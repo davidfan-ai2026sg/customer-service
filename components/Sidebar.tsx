@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 import { Inbox, Package, Settings, ShoppingBag, Leaf } from "lucide-react";
 
 const NAV = [
-  { href: "/", label: "会话", icon: Inbox },
-  { href: "/orders", label: "订单", icon: ShoppingBag },
-  { href: "/catalog", label: "商品", icon: Package },
-  { href: "/settings", label: "设置", icon: Settings },
+  { href: "/", label: "Inbox", icon: Inbox },
+  { href: "/orders", label: "Orders", icon: ShoppingBag },
+  { href: "/catalog", label: "Catalogue", icon: Package },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {
@@ -20,8 +20,8 @@ export function Sidebar() {
           <Leaf size={20} />
         </div>
         <div>
-          <div className="text-sm font-semibold tracking-wide text-white">味源食品</div>
-          <div className="text-xs text-ink-200">客服订货工作台</div>
+          <div className="text-sm font-semibold tracking-wide text-white">Aunty Hong</div>
+          <div className="text-xs text-ink-200">Hong · customer service</div>
         </div>
       </div>
       <nav className="flex-1 space-y-1 px-3">
@@ -45,9 +45,9 @@ export function Sidebar() {
         })}
       </nav>
       <div className="px-5 py-4 text-[11px] leading-5 text-ink-200">
-        演示无需 WhatsApp 凭证。
+        Hong talks to customers 24/7 once hosted.
         <br />
-        右侧模拟器即可走完下单。
+        This screen is for audit and hard cases.
       </div>
     </aside>
   );

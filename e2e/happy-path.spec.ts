@@ -3,32 +3,32 @@ import { expect, test } from "@playwright/test";
 test("ask product, place order, see it in dashboard", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto("/");
-  await expect(page.getByText("客户模拟器")).toBeVisible();
+  await expect(page.getByText("Customer simulator")).toBeVisible();
 
-  const box = page.getByPlaceholder("输入消息");
+  const box = page.getByPlaceholder("Type a message");
   async function customer(text: string) {
     await box.fill(text);
     await box.press("Enter");
     await page.waitForTimeout(400);
   }
 
-  await customer("生抽多少钱？");
-  await expect(page.locator("text=味源特级生抽").first()).toBeVisible({ timeout: 15_000 });
+  await customer("how much are the shrimp fries?");
+  await expect(page.locator("text=shrimp fries").first()).toBeVisible({ timeout: 15_000 });
 
-  await customer("我要下单");
-  await customer("味源特级生抽");
-  await customer("48");
-  await customer("没有");
-  await customer("配送");
-  await customer("张三");
-  await customer("13800138000");
-  await customer("上海市浦东新区张江路 88 号后厨");
-  await customer("无");
-  await customer("确认");
+  await customer("place an order");
+  await customer("gold tin");
+  await customer("3");
+  await customer("no");
+  await customer("delivery");
+  await customer("Priya Tan");
+  await customer("+65 9123 4567");
+  await customer("12 Marina Boulevard");
+  await customer("none");
+  await customer("confirm");
 
-  await expect(page.locator("text=订单已提交").first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator("text=Order submitted").first()).toBeVisible({ timeout: 15_000 });
 
   await page.goto("/orders");
-  await expect(page.getByText("味源特级生抽").first()).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("待确认").first()).toBeVisible();
+  await expect(page.getByText("shrimp fries").first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Pending").first()).toBeVisible();
 });

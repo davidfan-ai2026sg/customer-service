@@ -12,7 +12,7 @@ export async function maybePolishReply(userText: string, draft: string): Promise
   const products = listProducts(true)
     .slice(0, 20)
     .map((p) => `${p.name}(${p.sku}) ${p.price}/${p.unit} MOQ${p.moq}`)
-    .join("；");
+    .join("; ");
 
   const base = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
   const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
@@ -30,11 +30,11 @@ export async function maybePolishReply(userText: string, draft: string): Promise
         messages: [
           {
             role: "system",
-            content: `你是${settings.company_name}的客服小源。用简体中文，语气礼貌简洁。不要编造价格或库存。可售商品：${products}。交期：${settings.lead_time}`,
+            content: `You are Hong, customer-service bot for ${settings.company_name}. Reply in English, polite and concise. Do not invent prices or stock. Catalogue: ${products}. Lead time: ${settings.lead_time}`,
           },
           {
             role: "user",
-            content: `客户说：${userText}\n\n请在不改变事实（价格、数量、单号、起订量）的前提下润色下面回复，保持原有信息：\n${draft}`,
+            content: `The customer said: ${userText}\n\nPolish the reply below without changing facts (prices, quantities, order numbers, minimums). Keep every original fact:\n${draft}`,
           },
         ],
       }),

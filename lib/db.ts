@@ -18,7 +18,7 @@ import type {
 } from "./types";
 
 const globalForDb = globalThis as unknown as {
-  weiyuanDb?: Database.Database;
+  auntyHongDb?: Database.Database;
 };
 
 export function dbPath() {
@@ -98,7 +98,7 @@ function migrate(db: Database.Database) {
       delivery_type TEXT NOT NULL,
       address TEXT NOT NULL DEFAULT '',
       notes TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT '待确认',
+      status TEXT NOT NULL DEFAULT 'Pending',
       factory_sent_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -132,7 +132,7 @@ function seed(db: Database.Database) {
   if (productCount.c === 0) {
     const ins = db.prepare(
       `INSERT INTO products (name, sku, price, unit, moq, description, in_stock, category, aliases, created_at, updated_at)
-       VALUES (@name, @sku, @price, @unit, @moq, @description, 1, @category, @aliases, @now, @now)`
+       VALUES (@name, @sku, @price, @unit, @moq, @description, @in_stock, @category, @aliases, @now, @now)`
     );
     const tx = db.transaction(() => {
       for (const p of PRODUCTS) ins.run({ ...p, now });
@@ -152,8 +152,8 @@ function seed(db: Database.Database) {
   if (convCount.c === 0) {
     const demoId = createConversation(db, {
       channel: "demo",
-      customer_name: "演示客户（模拟器）",
-      customer_phone: "13800000000",
+      customer_name: "Demo customer (simulator)",
+      customer_phone: "+65 9000 0000",
       wa_id: "demo",
     });
     insertMessage(
@@ -165,34 +165,34 @@ function seed(db: Database.Database) {
 
     const histId = createConversation(db, {
       channel: "whatsapp",
-      customer_name: "上海鲜食堂",
-      customer_phone: "13912345678",
-      wa_id: "8613912345678",
+      customer_name: "Priya Tan",
+      customer_phone: "+65 9123 4567",
+      wa_id: "6591234567",
     });
-    insertMessage(db, histId, "customer", "你好，想订一批生抽和冷冻水饺。");
+    insertMessage(db, histId, "customer", "Hi, how much are the shrimp fries?");
     insertMessage(
       db,
       histId,
       "bot",
-      "收到。味源特级生抽 ¥28/瓶，起订 24 瓶；猪肉白菜水饺 ¥38/袋，起订 20 袋。请问数量？"
+      "Shrimp Fries | Prawn Crackers — Original - Golden Aunty Hong Tin is S$22.00 / tin. SKU SQ0179319. In stock. Online minimum is S$50."
     );
-    insertMessage(db, histId, "customer", "生抽 48 瓶，猪肉白菜水饺 40 袋，配送到浦东。");
-    insertMessage(db, histId, "staff", "已为您建单，今天排产，冷链一起发出。");
+    insertMessage(db, histId, "customer", "3 gold tins, delivery to Marina Boulevard please.");
+    insertMessage(db, histId, "staff", "Order noted. Kitchen will pack this week; we will confirm delivery.");
     db.prepare("UPDATE conversations SET status = 'staff', unread = 0 WHERE id = ?").run(histId);
 
-    const orderNo = "WY20260828001";
+    const orderNo = "AH20260828001";
     const orderNow = "2026-08-28T10:12:00.000+08:00";
     const info = db
       .prepare(
         `INSERT INTO orders (order_no, conversation_id, customer_name, customer_phone, delivery_type, address, notes, status, factory_sent_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'delivery', ?, '请工作日送货，冷链分开装', '已完成', ?, ?, ?)`
+         VALUES (?, ?, ?, ?, 'delivery', ?, 'Weekday delivery please', 'Completed', ?, ?, ?)`
       )
       .run(
         orderNo,
         histId,
-        "上海鲜食堂",
-        "13912345678",
-        "上海市浦东新区张江路 100 号后厨",
+        "Priya Tan",
+        "+65 9123 4567",
+        "12 Marina Boulevard, Singapore 018982",
         orderNow,
         orderNow,
         orderNow
@@ -200,11 +200,7 @@ function seed(db: Database.Database) {
     const oid = Number(info.lastInsertRowid);
     db.prepare(
       `INSERT INTO order_items (order_id, product_id, product_name, sku, unit, unit_price, qty)
-       VALUES (?, 1, '味源特级生抽', 'SS-001', '瓶', 28, 48)`
-    ).run(oid);
-    db.prepare(
-      `INSERT INTO order_items (order_id, product_id, product_name, sku, unit, unit_price, qty)
-       VALUES (?, 8, '猪肉白菜水饺', 'FD-101', '袋', 38, 40)`
+       VALUES (?, (SELECT id FROM products WHERE sku = 'SQ0179319'), 'Shrimp Fries | Prawn Crackers — Original - Golden Aunty Hong Tin', 'SQ0179319', 'tin', 22, 3)`
     ).run(oid);
   }
 }
@@ -214,24 +210,24 @@ export function nowIso() {
 }
 
 export function getDb(): Database.Database {
-  if (globalForDb.weiyuanDb) return globalForDb.weiyuanDb;
+  if (globalForDb.auntyHongDb) return globalForDb.auntyHongDb;
   const file = dbPath();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new Database(file);
   migrate(db);
   seed(db);
-  globalForDb.weiyuanDb = db;
+  globalForDb.auntyHongDb = db;
   return db;
 }
 
 export function resetDbForTests() {
-  if (globalForDb.weiyuanDb) {
+  if (globalForDb.auntyHongDb) {
     try {
-      globalForDb.weiyuanDb.close();
+      globalForDb.auntyHongDb.close();
     } catch {
       /* ignore */
     }
-    globalForDb.weiyuanDb = undefined;
+    globalForDb.auntyHongDb = undefined;
   }
   const file = dbPath();
   for (const ext of ["", "-wal", "-shm"]) {
@@ -329,8 +325,8 @@ export function findDemoConversation(): Conversation {
   if (existing) return existing;
   const id = createConversation(getDb(), {
     channel: "demo",
-    customer_name: "演示客户（模拟器）",
-    customer_phone: "13800000000",
+    customer_name: "Demo customer (simulator)",
+    customer_phone: "+65 9000 0000",
     wa_id: "demo",
   });
   return getConversation(id)!;
@@ -440,7 +436,7 @@ function hydrateOrder(order: Order): OrderWithItems {
 export function nextOrderNo() {
   const d = new Date();
   const day = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-  const prefix = `WY${day}`;
+  const prefix = `AH${day}`;
   const row = getDb()
     .prepare("SELECT order_no FROM orders WHERE order_no LIKE ? ORDER BY order_no DESC LIMIT 1")
     .get(`${prefix}%`) as { order_no: string } | undefined;
@@ -471,7 +467,7 @@ export function createOrder(input: {
     const info = db
       .prepare(
          `INSERT INTO orders (order_no, conversation_id, customer_name, customer_phone, delivery_type, address, notes, status, created_at, updated_at)
-         VALUES (@order_no, @conversation_id, @customer_name, @customer_phone, @delivery_type, @address, @notes, '待确认', @now, @now)`
+         VALUES (@order_no, @conversation_id, @customer_name, @customer_phone, @delivery_type, @address, @notes, 'Pending', @now, @now)`
       )
       .run({
         order_no: orderNo,
@@ -507,7 +503,7 @@ export function updateOrderStatus(id: number, status: OrderStatus) {
 export function markFactorySent(id: number) {
   const now = nowIso();
   getDb()
-    .prepare("UPDATE orders SET status = '已发工厂', factory_sent_at = ?, updated_at = ? WHERE id = ?")
+    .prepare("UPDATE orders SET status = 'Sent to kitchen', factory_sent_at = ?, updated_at = ? WHERE id = ?")
     .run(now, now, id);
   return getOrder(id);
 }

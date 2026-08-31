@@ -2,7 +2,7 @@
   "name": "customer-service",
   "version": "1.0.0",
   "private": true,
-  "description": "weiyuan foods customer service",
+  "description": "Aunty Hong customer-service bot (Hong)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

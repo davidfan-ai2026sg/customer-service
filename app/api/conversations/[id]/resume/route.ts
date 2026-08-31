@@ -9,6 +9,6 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   if (!conv) return NextResponse.json({ error: "not found" }, { status: 404 });
   setConversationStatus(conv.id, "bot");
   setBotState(conv.id, { mode: "idle" });
-  addMessage(conv.id, "bot", "（系统）机器人已恢复，可以继续自动回复。");
+  addMessage(conv.id, "bot", "Hong is back on automatic replies.");
   return NextResponse.json({ ok: true, status: "bot" });
 }

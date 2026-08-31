@@ -14,11 +14,11 @@ export async function POST(req: Request) {
       name: String(body.name),
       sku: String(body.sku),
       price: Number(body.price),
-      unit: String(body.unit || "件"),
+      unit: String(body.unit || "tin"),
       moq: Number(body.moq || 1),
       description: String(body.description || ""),
       in_stock: body.in_stock ? 1 : 0,
-      category: String(body.category || "其他"),
+      category: String(body.category || "Other"),
       aliases: String(body.aliases || ""),
     });
     return NextResponse.json(product);

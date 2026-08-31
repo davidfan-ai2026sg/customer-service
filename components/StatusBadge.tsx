@@ -1,17 +1,17 @@
 import type { ConversationStatus, OrderStatus } from "@/lib/types";
 
 const ORDER_CLASS: Record<OrderStatus, string> = {
-  待确认: "bg-amber-50 text-amber-800 ring-amber-200",
-  已确认: "bg-sky-50 text-sky-800 ring-sky-200",
-  已发工厂: "bg-violet-50 text-violet-800 ring-violet-200",
-  已完成: "bg-brand-50 text-brand-800 ring-brand-200",
-  已取消: "bg-slate-100 text-slate-600 ring-slate-200",
+  Pending: "bg-amber-50 text-amber-800 ring-amber-200",
+  Confirmed: "bg-sky-50 text-sky-800 ring-sky-200",
+  "Sent to kitchen": "bg-violet-50 text-violet-800 ring-violet-200",
+  Completed: "bg-brand-50 text-brand-800 ring-brand-200",
+  Cancelled: "bg-slate-100 text-slate-600 ring-slate-200",
 };
 
 const CONV_LABEL: Record<ConversationStatus, string> = {
-  bot: "机器人",
-  staff: "已接管",
-  waiting_staff: "待人工",
+  bot: "Hong",
+  staff: "Taken over",
+  waiting_staff: "Needs person",
 };
 
 const CONV_CLASS: Record<ConversationStatus, string> = {

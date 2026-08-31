@@ -29,29 +29,29 @@ export function SettingsView() {
     setTimeout(() => setSaved(false), 1500);
   }
 
-  if (!form) return <div className="p-8 text-sm">加载中…</div>;
+  if (!form) return <div className="p-8 text-sm">Loading…</div>;
 
   const fields: Array<{ key: keyof Settings; label: string; rows?: number }> = [
-    { key: "company_name", label: "公司名称" },
-    { key: "factory_email", label: "工厂邮箱" },
-    { key: "business_hours", label: "营业时间" },
-    { key: "greeting", label: "欢迎语（机器人）", rows: 6 },
-    { key: "lead_time", label: "交期说明", rows: 3 },
-    { key: "delivery_info", label: "配送说明", rows: 3 },
-    { key: "pickup_info", label: "自提说明", rows: 3 },
-    { key: "payment_info", label: "付款说明", rows: 3 },
+    { key: "company_name", label: "Company name" },
+    { key: "factory_email", label: "Kitchen email" },
+    { key: "business_hours", label: "Hours" },
+    { key: "greeting", label: "Greeting", rows: 6 },
+    { key: "lead_time", label: "Lead time", rows: 3 },
+    { key: "delivery_info", label: "Delivery", rows: 3 },
+    { key: "pickup_info", label: "Collection", rows: 3 },
+    { key: "payment_info", label: "Payment", rows: 3 },
   ];
 
   return (
     <div className="mx-auto max-w-3xl p-8">
-      <h1 className="text-2xl font-semibold">公司设置</h1>
-      <p className="mt-1 text-sm text-ink-700/70">这些内容会进入机器人回复与工厂通知单。</p>
+      <h1 className="text-2xl font-semibold">Settings</h1>
+      <p className="mt-1 text-sm text-ink-700/70">These go into Hong’s replies and the kitchen sheet.</p>
 
       {health && (
         <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
-          <Pill ok={health.whatsapp} on="WhatsApp Cloud 已连接" off="WhatsApp 未配置（演示可用）" />
-          <Pill ok={health.email} on="工厂邮件通道已配置" off="未配置邮件（仍可打印通知单）" />
-          <Pill ok={health.llm} on="LLM 润色已开启" off="未配置 LLM（目录匹配）" />
+          <Pill ok={health.whatsapp} on="WhatsApp Cloud connected" off="WhatsApp not configured (simulator still works)" />
+          <Pill ok={health.email} on="Kitchen email channel configured" off="Email not configured (you can still print the kitchen sheet)" />
+          <Pill ok={health.llm} on="LLM polish on" off="LLM not configured (catalogue keyword matching)" />
         </div>
       )}
 
@@ -76,7 +76,7 @@ export function SettingsView() {
           </label>
         ))}
         <button onClick={save} className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-medium text-white">
-          {saved ? "已保存" : "保存设置"}
+          {saved ? "Saved" : "Save"}
         </button>
       </div>
     </div>

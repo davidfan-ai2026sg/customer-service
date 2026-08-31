@@ -5,33 +5,33 @@ function money(n: number) {
 }
 
 function shipLabel(order: OrderWithItems) {
-  return order.delivery_type === "pickup" ? "工厂自提" : "物流配送";
+  return order.delivery_type === "pickup" ? "Collection" : "Delivery";
 }
 
 export function orderSheetText(order: OrderWithItems, settings: Settings) {
   const lines = [
-    `======== ${settings.company_name} · 工厂生产通知单 ========`,
-    `订单号：${order.order_no}`,
-    `状态：${order.status}`,
-    `下单时间：${order.created_at}`,
-    `发给工厂时间：${order.factory_sent_at || "（待发送）"}`,
+    `======== ${settings.company_name} · Kitchen sheet ========`,
+    `Order no.: ${order.order_no}`,
+    `Status: ${order.status}`,
+    `Placed: ${order.created_at}`,
+    `Sent to kitchen: ${order.factory_sent_at || "(not sent yet)"}`,
     "",
-    `客户：${order.customer_name}`,
-    `电话：${order.customer_phone}`,
-    `收货方式：${shipLabel(order)}`,
-    `地址：${order.address || "-"}`,
-    `备注：${order.notes || "无"}`,
+    `Customer: ${order.customer_name}`,
+    `Phone: ${order.customer_phone}`,
+    `Fulfilment: ${shipLabel(order)}`,
+    `Address: ${order.address || "-"}`,
+    `Notes: ${order.notes || "None"}`,
     "",
-    "---- 明细 ----",
+    "---- Items ----",
   ];
   order.items.forEach((it, i) => {
     lines.push(
-      `${i + 1}. ${it.product_name}  SKU ${it.sku}  ${it.qty}${it.unit}  单价 ${money(it.unit_price)}  小计 ${money(it.unit_price * it.qty)}`
+      `${i + 1}. ${it.product_name}  SKU ${it.sku}  ${it.qty} ${it.unit}  unit S$${money(it.unit_price)}  line S$${money(it.unit_price * it.qty)}`
     );
   });
-  lines.push("", `合计金额：${money(order.total)} 元`);
-  lines.push("", `工厂邮箱：${settings.factory_email}`);
-  lines.push("请按明细备货 / 排产，冷链与常温请分装。");
+  lines.push("", `Total S$${money(order.total)}`);
+  lines.push("", `Kitchen email: ${settings.factory_email}`);
+  lines.push("Please pack to the line items. Keep chilled and ambient goods separate.");
   lines.push("==========================================");
   return lines.join("\n");
 }
@@ -45,18 +45,18 @@ export function orderSheetHtml(order: OrderWithItems, settings: Settings) {
         <td>${escapeHtml(it.sku)}</td>
         <td>${it.qty}</td>
         <td>${escapeHtml(it.unit)}</td>
-        <td>¥${money(it.unit_price)}</td>
-        <td>¥${money(it.unit_price * it.qty)}</td>
+        <td>S$${money(it.unit_price)}</td>
+        <td>S$${money(it.unit_price * it.qty)}</td>
       </tr>`
     )
     .join("");
   return `<!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>生产通知单 ${order.order_no}</title>
+  <title>Kitchen sheet ${order.order_no}</title>
   <style>
-    body { font-family: "Noto Sans SC", "PingFang SC", sans-serif; color: #12221e; margin: 32px; }
+    body { font-family: "Noto Sans", "Helvetica Neue", Arial, sans-serif; color: #12221e; margin: 32px; }
     h1 { font-size: 20px; margin: 0 0 4px; }
     .sub { color: #5b6f69; margin-bottom: 20px; }
     table { border-collapse: collapse; width: 100%; margin-top: 12px; }
@@ -68,27 +68,27 @@ export function orderSheetHtml(order: OrderWithItems, settings: Settings) {
   </style>
 </head>
 <body>
-  <button onclick="window.print()">打印</button>
-  <h1>${escapeHtml(settings.company_name)} · 工厂生产通知单</h1>
-  <div class="sub">请按明细备货，冷链与常温分装。单号 ${escapeHtml(order.order_no)}</div>
+  <button onclick="window.print()">Print</button>
+  <h1>${escapeHtml(settings.company_name)} · Kitchen sheet</h1>
+  <div class="sub">Pack to the line items. Keep chilled and ambient goods separate. Order ${escapeHtml(order.order_no)}</div>
   <div class="grid">
-    <div>订单号：${escapeHtml(order.order_no)}</div>
-    <div>状态：${escapeHtml(order.status)}</div>
-    <div>客户：${escapeHtml(order.customer_name)}</div>
-    <div>电话：${escapeHtml(order.customer_phone)}</div>
-    <div>收货：${escapeHtml(shipLabel(order))}</div>
-    <div>下单：${escapeHtml(order.created_at)}</div>
-    <div>地址：${escapeHtml(order.address || "-")}</div>
-    <div>工厂邮箱：${escapeHtml(settings.factory_email)}</div>
+    <div>Order no.: ${escapeHtml(order.order_no)}</div>
+    <div>Status: ${escapeHtml(order.status)}</div>
+    <div>Customer: ${escapeHtml(order.customer_name)}</div>
+    <div>Phone: ${escapeHtml(order.customer_phone)}</div>
+    <div>Fulfilment: ${escapeHtml(shipLabel(order))}</div>
+    <div>Placed: ${escapeHtml(order.created_at)}</div>
+    <div>Address: ${escapeHtml(order.address || "-")}</div>
+    <div>Kitchen email: ${escapeHtml(settings.factory_email)}</div>
   </div>
-  <p>备注：${escapeHtml(order.notes || "无")}</p>
+  <p>Notes: ${escapeHtml(order.notes || "None")}</p>
   <table>
     <thead>
-      <tr><th>#</th><th>商品</th><th>SKU</th><th>数量</th><th>单位</th><th>单价</th><th>小计</th></tr>
+      <tr><th>#</th><th>Product</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit price</th><th>Line</th></tr>
     </thead>
     <tbody>${rows}</tbody>
   </table>
-  <div class="total">合计：¥${money(order.total)}</div>
+  <div class="total">Total S$${money(order.total)}</div>
 </body>
 </html>`;
 }

@@ -19,7 +19,7 @@ export async function sendFactoryEmail(opts: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: process.env.RESEND_FROM || "Weiyuan <onboarding@resend.dev>",
+          from: process.env.RESEND_FROM || "Aunty Hong <onboarding@resend.dev>",
           to: [opts.to],
           subject: opts.subject,
           html: opts.html,
@@ -61,5 +61,5 @@ export async function sendFactoryEmail(opts: {
     }
   }
 
-  return { sent: false, error: "未配置 RESEND_API_KEY 或 SMTP_HOST，已跳过发信。" };
+  return { sent: false, error: "RESEND_API_KEY or SMTP_HOST is not set; skipped sending." };
 }

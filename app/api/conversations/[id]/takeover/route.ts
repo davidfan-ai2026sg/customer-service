@@ -8,6 +8,6 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const conv = getConversation(Number(id));
   if (!conv) return NextResponse.json({ error: "not found" }, { status: 404 });
   setConversationStatus(conv.id, "staff");
-  addMessage(conv.id, "staff", "（系统）同事已接管本会话，机器人暂停回复。");
+  addMessage(conv.id, "staff", "A colleague has taken over this chat. Hong is paused.");
   return NextResponse.json({ ok: true, status: "staff" });
 }
