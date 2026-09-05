@@ -52,6 +52,32 @@ export async function POST(req: Request) {
   }
 
   const raw = await req.text();
+
+  // Drop delivery/read/sent receipts — they used to wake Hong for nothing and
+  // serialized behind real customer texts (often +30–90s of queue delay).
+  try {
+    const payload = JSON.parse(raw) as {
+      entry?: Array<{
+        changes?: Array<{ value?: { messages?: unknown[]; statuses?: unknown[] } }>;
+      }>;
+    };
+    let hasMessage = false;
+    for (const entry of payload.entry ?? []) {
+      for (const change of entry.changes ?? []) {
+        if ((change.value?.messages?.length ?? 0) > 0) {
+          hasMessage = true;
+          break;
+        }
+      }
+      if (hasMessage) break;
+    }
+    if (!hasMessage) {
+      return NextResponse.json({ ok: true, skipped: "no inbound messages" });
+    }
+  } catch {
+    // Non-JSON: still forward (Meta should always send JSON).
+  }
+
   const headers: Record<string, string> = {
     "Content-Type": req.headers.get("content-type") || "application/json",
     Authorization: `Bearer ${key}`,
